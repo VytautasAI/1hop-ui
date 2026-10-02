@@ -9,35 +9,6 @@
  * Design: docs/design/*.png + Day 2 brief (docs/HOP_SPEC.md §0, §10).
  */
 
-// TEMP diagnostics (remove on Day 3): where Wix loaded this file, and whether <hop-app> is in this document.
-console.info('[hops] hop-app.js loaded', {
-  topFrame: window === window.top,
-  href: String(location.href).slice(0, 120),
-  hopAppTagsInThisDocument: document.querySelectorAll('hop-app').length,
-  alreadyDefined: Boolean(window.customElements && customElements.get('hop-app')),
-});
-[2000, 8000].forEach((ms) => setTimeout(() => console.info(`[hops] after ${ms / 1000}s: <hop-app> tags =`, document.querySelectorAll('hop-app').length,
-  '| body children:', Array.from((document.body && document.body.children) || []).map((n) => n.tagName.toLowerCase()).join(',')), ms));
-try {
-  let seen = 0;
-  new MutationObserver((records) => records.forEach((r) => r.addedNodes.forEach((n) => {
-    if (n.nodeType === 1 && seen++ < 15) console.info('[hops] element added:', n.tagName.toLowerCase());
-  }))).observe(document, { childList: true, subtree: true });
-  let msgs = 0;
-  window.addEventListener('message', (e) => {
-    if (msgs++ >= 10) return;
-    let summary;
-    try {
-      summary = typeof e.data === 'string' ? e.data.slice(0, 160) : JSON.stringify(e.data).slice(0, 160);
-    } catch (err) {
-      summary = String(e.data);
-    }
-    console.info('[hops] message to iframe:', summary);
-  });
-} catch (err) {
-  console.error('[hops] diagnostics failed', err);
-}
-
 const GBP = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const SHORT_DATE = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
 const CONTACT_FIELDS = ['name', 'email', 'phone'];
@@ -111,6 +82,10 @@ const STYLE = `
   --panel:#e6f1f6; --blue:#1f7aa6; --amber:#8c600c; --green:#257a4c; --grey:#5b6b7a; --red:#ad3a31; }
 *, *::before, *::after { box-sizing:border-box; }
 .app { font-size:16px; line-height:1.45; -webkit-font-smoothing:antialiased; }
+/* Centred column like the mockups, whatever width the Wix element is stretched to. */
+.wrap { max-width:1200px; margin:0 auto; padding:28px 16px 40px; }
+.wrap.narrow { max-width:760px; }
+@media (min-width:640px) { .wrap { padding:40px 24px 56px; } }
 [hidden] { display:none !important; }
 .sr { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; }
 .hp { position:absolute; left:-10000px; width:1px; height:1px; opacity:0; }
@@ -280,7 +255,6 @@ class HopApp extends HTMLElement {
 
   constructor() {
     super();
-    console.info('[hops] <hop-app> created'); // TEMP diagnostics
     try {
       this.root = this.shadowRoot || this.attachShadow({ mode: 'open' });
     } catch (err) {
@@ -306,14 +280,12 @@ class HopApp extends HTMLElement {
   }
 
   connectedCallback() {
-    console.info('[hops] <hop-app> on page'); // TEMP diagnostics
     if (!this.started) this.paint(this.loadingHtml());
     this.start();
   }
 
   attributeChangedCallback(name, _old, value) {
     if (name === 'ready' && value) {
-      if (!this.bridgeReady) console.info('[hops] <hop-app> bridge ready'); // TEMP diagnostics
       this.bridgeReady = true;
       clearTimeout(this.helloTimer);
       if (this.onBridgeReady) this.onBridgeReady(true);
@@ -339,7 +311,6 @@ class HopApp extends HTMLElement {
       } catch (err) {
         this.config = null;
       }
-      console.info('[hops] <hop-app> got config', this.config && this.config.view); // TEMP diagnostics
       this.start();
     }
   }
@@ -440,7 +411,8 @@ class HopApp extends HTMLElement {
     }
     const toast = this.root.getElementById('toast');
     const toastText = toast ? toast.textContent : '';
-    this.root.innerHTML = `<style>${STYLE}</style><div class="app">${html}</div><div class="toast" id="toast" role="status" aria-live="polite">${esc(toastText)}</div>`;
+    const narrow = this.config && ['hop', 'admin'].includes(this.config.view) ? ' narrow' : '';
+    this.root.innerHTML = `<style>${STYLE}</style><div class="app"><div class="wrap${narrow}">${html}</div></div><div class="toast" id="toast" role="status" aria-live="polite">${esc(toastText)}</div>`;
     if (id) this.focus(id, sel);
   }
 
@@ -1453,12 +1425,8 @@ class HopApp extends HTMLElement {
 }
 
 try {
-  if (customElements.get('hop-app')) {
-    console.warn('[hops] "hop-app" was already defined by another script; ours was not registered'); // TEMP diagnostics
-  } else {
-    customElements.define('hop-app', HopApp);
-    console.info('[hops] <hop-app> defined'); // TEMP diagnostics
-  }
+  if (customElements.get('hop-app')) console.warn('[hops] "hop-app" is already defined by another script');
+  else customElements.define('hop-app', HopApp);
 } catch (err) {
   console.error('[hops] customElements.define failed', err);
 }
