@@ -9,8 +9,14 @@
  * Design: docs/design/*.png + Day 2 brief (docs/HOP_SPEC.md §0, §10).
  */
 
-// TEMP diagnostics (remove on Day 3): confirms Wix loaded this file.
-console.info('[hops] hop-app.js loaded');
+// TEMP diagnostics (remove on Day 3): where Wix loaded this file, and whether <hop-app> is in this document.
+console.info('[hops] hop-app.js loaded', {
+  topFrame: window === window.top,
+  href: String(location.href).slice(0, 120),
+  hopAppTagsInThisDocument: document.querySelectorAll('hop-app').length,
+  alreadyDefined: Boolean(window.customElements && customElements.get('hop-app')),
+});
+setTimeout(() => console.info('[hops] after 2s: <hop-app> tags in this document =', document.querySelectorAll('hop-app').length), 2000);
 
 const GBP = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const SHORT_DATE = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -252,7 +258,15 @@ class HopApp extends HTMLElement {
 
   constructor() {
     super();
-    this.root = this.attachShadow({ mode: 'open' });
+    console.info('[hops] <hop-app> created'); // TEMP diagnostics
+    try {
+      this.root = this.shadowRoot || this.attachShadow({ mode: 'open' });
+    } catch (err) {
+      console.error('[hops] attachShadow failed, rendering without shadow DOM', err);
+      this.root = this.appendChild(document.createElement('div'));
+      this.root.getElementById = (id) => this.root.querySelector(`#${CSS.escape(id)}`);
+      Object.defineProperty(this.root, 'activeElement', { get: () => (this.root.contains(document.activeElement) ? document.activeElement : null) });
+    }
     this.pending = new Map();
     this.seq = 0;
     this.config = null;
@@ -1382,4 +1396,13 @@ class HopApp extends HTMLElement {
   }
 }
 
-if (!customElements.get('hop-app')) customElements.define('hop-app', HopApp);
+try {
+  if (customElements.get('hop-app')) {
+    console.warn('[hops] "hop-app" was already defined by another script; ours was not registered'); // TEMP diagnostics
+  } else {
+    customElements.define('hop-app', HopApp);
+    console.info('[hops] <hop-app> defined'); // TEMP diagnostics
+  }
+} catch (err) {
+  console.error('[hops] customElements.define failed', err);
+}
