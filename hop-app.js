@@ -77,6 +77,9 @@ function options(pairs, selected) {
 }
 
 const STYLE = `
+/* Wix gives the element a fixed min-height equal to its box in the Editor; hug the content instead.
+   (!important in :host beats the page's normal rules.) Keep the Editor box small; it grows with the content. */
+:host { height:auto !important; min-height:0 !important; }
 :host { display:block; font-family:"Helvetica Neue", Helvetica, Arial, sans-serif; color:#33475b;
   --primary:#1f7aa6; --primary-dark:#175f82; --ink:#1c2b3a; --muted:#566879; --line:#d5e1e9; --soft:#f2f6f8;
   --panel:#e6f1f6; --blue:#1f7aa6; --amber:#8c600c; --green:#257a4c; --grey:#5b6b7a; --red:#ad3a31; }
