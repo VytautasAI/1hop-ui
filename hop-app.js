@@ -16,7 +16,27 @@ console.info('[hops] hop-app.js loaded', {
   hopAppTagsInThisDocument: document.querySelectorAll('hop-app').length,
   alreadyDefined: Boolean(window.customElements && customElements.get('hop-app')),
 });
-setTimeout(() => console.info('[hops] after 2s: <hop-app> tags in this document =', document.querySelectorAll('hop-app').length), 2000);
+[2000, 8000].forEach((ms) => setTimeout(() => console.info(`[hops] after ${ms / 1000}s: <hop-app> tags =`, document.querySelectorAll('hop-app').length,
+  '| body children:', Array.from((document.body && document.body.children) || []).map((n) => n.tagName.toLowerCase()).join(',')), ms));
+try {
+  let seen = 0;
+  new MutationObserver((records) => records.forEach((r) => r.addedNodes.forEach((n) => {
+    if (n.nodeType === 1 && seen++ < 15) console.info('[hops] element added:', n.tagName.toLowerCase());
+  }))).observe(document, { childList: true, subtree: true });
+  let msgs = 0;
+  window.addEventListener('message', (e) => {
+    if (msgs++ >= 10) return;
+    let summary;
+    try {
+      summary = typeof e.data === 'string' ? e.data.slice(0, 160) : JSON.stringify(e.data).slice(0, 160);
+    } catch (err) {
+      summary = String(e.data);
+    }
+    console.info('[hops] message to iframe:', summary);
+  });
+} catch (err) {
+  console.error('[hops] diagnostics failed', err);
+}
 
 const GBP = new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const SHORT_DATE = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' });
