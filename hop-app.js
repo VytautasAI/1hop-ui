@@ -49,6 +49,8 @@ const ADMIN_TARGETS = [
   ['GATHERING_INTEREST', 'Re-open (gathering interest)'],
 ];
 const REQUEST_TIMEOUT_MS = 30000;
+const HELLO_INTERVAL_MS = 400;
+const HELLO_MAX_TRIES = 50; // ~20 s
 
 /**
  * HTML-escapes a value for text and attribute contexts.
@@ -273,7 +275,7 @@ summary { cursor:pointer; color:var(--primary); font-weight:700; min-height:44px
 
 class HopApp extends HTMLElement {
   static get observedAttributes() {
-    return ['config', 'response'];
+    return ['config', 'response', 'ready'];
   }
 
   constructor() {
@@ -310,6 +312,13 @@ class HopApp extends HTMLElement {
   }
 
   attributeChangedCallback(name, _old, value) {
+    if (name === 'ready' && value) {
+      if (!this.bridgeReady) console.info('[hops] <hop-app> bridge ready'); // TEMP diagnostics
+      this.bridgeReady = true;
+      clearTimeout(this.helloTimer);
+      if (this.onBridgeReady) this.onBridgeReady(true);
+      return;
+    }
     if (name === 'response' && value) {
       let msg;
       try {
@@ -355,10 +364,37 @@ class HopApp extends HTMLElement {
     });
   }
 
+  /**
+   * Waits until the page code is listening. Wix can attach the page's event listener after the element
+   * receives its config, so the first event could be lost; ping with `hop-hello` until the bridge sets `ready`.
+   * @returns {Promise<boolean>}
+   */
+  waitForBridge() {
+    if (this.bridgeReady) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      this.onBridgeReady = resolve;
+      let tries = 0;
+      const ping = () => {
+        if (this.bridgeReady) return;
+        tries += 1;
+        this.dispatchEvent(new CustomEvent('hop-hello', { detail: { tries } }));
+        if (tries < HELLO_MAX_TRIES) this.helloTimer = setTimeout(ping, HELLO_INTERVAL_MS);
+        else resolve(false);
+      };
+      ping();
+    });
+  }
+
   async start() {
     if (this.started || !this.config || !this.isConnected) return;
     this.started = true;
     this.paint(this.loadingHtml());
+    if (!(await this.waitForBridge())) {
+      console.error('[hops] <hop-app> page code never answered (no "ready"). Check the page code calls connectHopApp() with this element ID.');
+      this.started = false;
+      this.paint(this.stateHtml("We couldn't connect this page. Please refresh.", 'retry-start'));
+      return;
+    }
     const res = await this.call('getUiConfig');
     if (!res.ok) {
       this.started = false;
